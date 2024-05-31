@@ -1,4 +1,6 @@
 const multer = require("multer");
+const sharp = require("sharp");
+const fs = require("fs");
 
 const MIME_TYPES = {
   "image/jpg": "jpg",
@@ -20,4 +22,38 @@ const storage = multer.diskStorage({
   },
 });
 
-module.exports = multer({ storage: storage }).single("image");
+const upload = multer({ storage: storage }).single("image");
+
+const uploadAndOptimizeImage = (req, res, next) => {
+  upload(req, res, async (err) => {
+    if (err) {
+      return next(err);
+    }
+    if (!req.file) {
+      return next();
+    }
+
+    const filename = req.file.filename;
+    const filePath = `images/${filename}`;
+
+    try {
+      await sharp(filePath)
+        .resize(800) // Redimensionner l'image à 800px de largeur, ajustez selon vos besoins
+        .webp({ quality: 80 }) // Convertir en WebP avec une qualité de 80, ajustez selon vos besoins
+        .toFile(`images/optimized-${filename}`);
+
+      fs.unlink(filePath, (err) => {
+        // NE FONCTIONNE PAAAAAAS
+        if (err) console.error("Error deleting original image:", err);
+      });
+
+      req.file.filename = `optimized-${filename}`;
+      next();
+    } catch (error) {
+      console.error("Error optimizing image:", error);
+      next(error);
+    }
+  });
+};
+
+module.exports = uploadAndOptimizeImage;
