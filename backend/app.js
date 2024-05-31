@@ -1,9 +1,24 @@
 const express = require("express");
+const mongoose = require("mongoose");
+require("dotenv").config();
+const path = require("path");
+
+const bookRoutes = require("./routes/book");
+const userRoutes = require("./routes/user");
+
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("Connexion à MongoDB réussie !"))
+  .catch(() => console.log("Connexion à MongoDB échouée !"));
 
 const app = express();
 
 app.use(express.json());
 
+app.use("/images", express.static(path.join(__dirname, "images")));
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
@@ -15,50 +30,14 @@ app.use((req, res, next) => {
     "GET, POST, PUT, DELETE, PATCH, OPTIONS"
   );
 
+  // Gérer les requêtes OPTIONS
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
   next();
 });
-
-app.post("api/books", (req, res, next) => {
-  console.log(req.body);
-  res.status(201).json({ message: "livre créé !" });
-});
-
-app.get("/api/books", (req, res, next) => {
-  const books = [
-    {
-      userId: "oeihfzeoi",
-      title: "Les misérables",
-      author: "Victor Hugo",
-      imageUrl:
-        "https://cdn.pixabay.com/photo/2019/06/11/18/56/camera-4267692_1280.jpg",
-      year: 4900,
-      genre: "SF",
-      ratings: [
-        {
-          userID: "oeihfzeoi",
-          grade: 4,
-        },
-      ],
-      averageRating: 4,
-    },
-    {
-      userId: "oeihoi",
-      title: "John Rambo",
-      author: "Charles Beaudelaire",
-      imageUrl:
-        "https://cdn.pixabay.com/photo/2019/06/11/18/56/camera-4267692_1280.jpg",
-      year: 2016,
-      genre: "Recueil de poèmes",
-      ratings: [
-        {
-          userID: "oeiheoi",
-          grade: 5,
-        },
-      ],
-      averageRating: 4.9,
-    },
-  ];
-  res.status(200).json(books);
-});
+app.use("/api/books", bookRoutes);
+app.use("/api/auth", userRoutes);
 
 module.exports = app;
