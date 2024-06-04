@@ -1,5 +1,7 @@
 const Book = require("../models/Book");
+const mongoose = require("mongoose");
 const fs = require("fs");
+const path = require("path");
 
 exports.createBook = (req, res, next) => {
   console.log("Received book data:", req.body);
@@ -7,6 +9,7 @@ exports.createBook = (req, res, next) => {
   const bookObject = JSON.parse(req.body.book);
   delete bookObject._id;
   delete bookObject._userId;
+
   const book = new Book({
     ...bookObject,
     userId: req.auth.userId,
@@ -17,10 +20,13 @@ exports.createBook = (req, res, next) => {
 
   book
     .save()
-    .then(() => {
-      res.status(201).json({ message: "Objet enregistré !" });
+    .then((createdBook) => {
+      res
+        .status(201)
+        .json({ message: "Objet enregistré !", bookId: createdBook._id });
     })
     .catch((error) => {
+      console.error("Error saving book:", error);
       res.status(400).json({ error });
     });
 };
@@ -38,18 +44,40 @@ exports.modifyBook = (req, res, next) => {
   delete bookObject._userId;
   Book.findOne({ _id: req.params.id })
     .then((book) => {
-      if (book.userId != req.auth.userId) {
-        res.status(401).json({ message: "Not authorized" });
-      } else {
-        Book.updateOne(
-          { _id: req.params.id },
-          { ...bookObject, _id: req.params.id }
-        )
-          .then(() => res.status(200).json({ message: "Objet modifié!" }))
-          .catch((error) => res.status(401).json({ error }));
+      if (!book) {
+        return res.status(404).json({ message: "Book not found" });
       }
+      if (book.userId != req.auth.userId) {
+        return res.status(401).json({ message: "Not authorized" });
+      }
+
+      // SUPPRIMER L'ANCIENNE IMAGE OPTIMISÉE SI UNE NOUVELLE IMAGE EST TÉLÉCHARGÉE
+      if (req.file) {
+        const oldFilename = book.imageUrl.split("/images/")[1];
+        const oldFilePath = path.join(__dirname, "../images", oldFilename);
+
+        fs.promises
+          .unlink(oldFilePath)
+          .then(() => {
+            console.log(`Deleted previous optimized file: ${oldFilePath}`);
+          })
+          .catch((error) => {
+            console.error("Error deleting previous optimized image:", error);
+          });
+      }
+
+      Book.updateOne(
+        { _id: req.params.id },
+        { ...bookObject, _id: req.params.id }
+      )
+        .then(() => res.status(200).json({ message: "Objet modifié!" }))
+        .catch((error) => {
+          console.error("Error updating book:", error);
+          res.status(400).json({ error });
+        });
     })
     .catch((error) => {
+      console.error("Error finding book:", error);
       res.status(400).json({ error });
     });
 };
@@ -97,8 +125,72 @@ exports.getAllBooks = (req, res, next) => {
     });
 };
 
-// exports.bestRatingBooks = (req, res, next) => {
-//   Book.find({ _id: req.params.averageRating >= 4 })
-//     .then((books) => res.status(200).json(books))
-//     .catch((error) => res.status(400).json({ error }));
-// };
+exports.rateBook = (req, res, next) => {
+  const { id } = req.params;
+  const rating = parseInt(req.body.rating, 10);
+  const userId = req.auth.userId;
+  console.log("Received ID:", id);
+  console.log("Received rating:", rating);
+
+  if (isNaN(rating) || rating < 1 || rating > 5) {
+    return res
+      .status(400)
+      .json({ message: "Rating should be between 1 and 5" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid book ID" });
+  }
+
+  const objectId = new mongoose.Types.ObjectId(id);
+
+  Book.findOne({ _id: objectId })
+    .then((book) => {
+      if (!book) {
+        return res.status(404).json({ message: "Book not found" });
+      }
+
+      // Ajouter ou mettre à jour la note de l'utilisateur dans le tableau `ratings`
+      const existingRatingIndex = book.ratings.findIndex(
+        (rating) => rating.userId === userId
+      );
+
+      if (existingRatingIndex !== -1) {
+        // Mettre à jour la note existante
+        book.ratings[existingRatingIndex].grade = rating;
+      } else {
+        // Ajouter une nouvelle note
+        book.ratings.push({ userId, grade: rating });
+      }
+
+      // Recalculer la note moyenne
+      const newRatingsCount = book.ratings.length;
+      const newAverageRating =
+        book.ratings.reduce((acc, curr) => acc + curr.grade, 0) /
+        newRatingsCount;
+
+      book.averageRating = newAverageRating;
+
+      return book.save();
+    })
+    .then((updatedBook) => {
+      console.log("Book rating updated successfully");
+      res.status(200).json(updatedBook); // Retourner le livre mis à jour
+    })
+    .catch((error) => {
+      console.error("Error updating book rating:", error);
+      res.status(500).json({ error });
+    });
+};
+
+exports.bestRatingBooks = (req, res, next) => {
+  Book.find({ averageRating: { $gte: 1 } })
+    .sort({ averageRating: -1 })
+    .limit(3)
+    .then((books) => {
+      res.status(200).json(books);
+    })
+    .catch((error) => {
+      res.status(400).json({ error });
+    });
+};

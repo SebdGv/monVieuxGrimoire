@@ -3,7 +3,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 exports.signup = (req, res, next) => {
-  console.log("Signup request body:", req.body); // Ajout de log pour vérifier le corps de la requête
+  // Hachage du mot de passe, création et sauvegarde du nouvel utilisateur
   bcrypt
     .hash(req.body.password, 10)
     .then((hash) => {
@@ -15,12 +15,12 @@ exports.signup = (req, res, next) => {
         .save()
         .then(() => res.status(201).json({ message: "Utilisateur créé !" }))
         .catch((error) => {
-          console.error("Error saving user:", error); // Ajout de log pour les erreurs
+          console.error("Error saving user:", error);
           res.status(400).json({ error });
         });
     })
     .catch((error) => {
-      console.error("Error hashing password:", error); // Ajout de log pour les erreurs de hash
+      console.error("Error hashing password:", error);
       res.status(500).json({ error });
     });
 };
@@ -33,7 +33,7 @@ exports.login = (req, res, next) => {
           .status(401)
           .json({ message: "Paire identifiant/mot de passe incorrecte" });
       } else {
-        bcrypt
+        bcrypt //comparaison mdp fourni avec mdp haché dans la base de données
           .compare(req.body.password, user.password)
           .then((valid) => {
             if (!valid) {
@@ -47,7 +47,7 @@ exports.login = (req, res, next) => {
                   {
                     userId: user._id,
                   },
-                  "RANDOM_TOKEN_SECRET",
+                  "RANDOM_TOKEN_SECRET", // Clé secrète pour signer le token(version simple pour dev)
                   {
                     expiresIn: "24h",
                   }
