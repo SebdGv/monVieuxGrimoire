@@ -3,9 +3,11 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 const path = require("path");
 
+//Importer les routes
 const bookRoutes = require("./routes/book");
 const userRoutes = require("./routes/user");
 
+// Connexion à la base de données MongoDB
 mongoose
   .connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
@@ -16,9 +18,11 @@ mongoose
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json()); // Middleware pour parser le corps des requêtes en JSON
 
 app.use("/images", express.static(path.join(__dirname, "images")));
+
+// Middleware pour configurer les en-têtes CORS
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
@@ -37,6 +41,8 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Utiliser les routes définies pour les livres et les utilisateurs
 app.use("/api/books", bookRoutes);
 app.use("/api/auth", userRoutes);
 
