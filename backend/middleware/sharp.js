@@ -28,7 +28,6 @@ const optimizeImage = async (req, res, next) => {
 
     // SUPPRIMER LE FICHIER ORIGINAL APRÈS AVOIR CRÉÉ LE FICHIER OPTIMISÉ
     await fs.promises.unlink(filePath);
-    console.log(`Deleted original file: ${filePath}`);
 
     // METTRE À JOUR LE NOM DU FICHIER DANS REQ.FILE
     req.file.filename = optimizedFilename;

@@ -6,7 +6,7 @@ const MIME_TYPES = {
   "image/png": "png",
   "image/webp": "webp",
 };
-
+// Configuration du stockage des fichiers avec Multer
 const storage = multer.diskStorage({
   destination: (req, file, callback) => {
     callback(null, "images");

@@ -7,11 +7,13 @@ exports.signup = (req, res, next) => {
   bcrypt
     .hash(req.body.password, 10)
     .then((hash) => {
+      // Création d'un nouvel utilisateur
       const user = new User({
         email: req.body.email,
         password: hash,
       });
       user
+        // Sauvegarde de l'utilisateur dans la base de données
         .save()
         .then(() => res.status(201).json({ message: "Utilisateur créé !" }))
         .catch((error) => {
@@ -26,6 +28,7 @@ exports.signup = (req, res, next) => {
 };
 
 exports.login = (req, res, next) => {
+  // Recherche de l'utilisateur par email dans la base de données
   User.findOne({ email: req.body.email })
     .then((user) => {
       if (user === null) {
@@ -41,6 +44,7 @@ exports.login = (req, res, next) => {
                 .status(401)
                 .json({ message: "Paire identifiant/mot de passe incorrecte" });
             } else {
+              // Si l'authentification réussit, renvoyer l'ID utilisateur et un token JWT
               res.status(200).json({
                 userId: user._id,
                 token: jwt.sign(

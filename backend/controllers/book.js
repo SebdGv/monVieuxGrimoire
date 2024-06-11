@@ -6,10 +6,12 @@ const path = require("path");
 exports.createBook = (req, res, next) => {
   console.log("Received book data:", req.body);
 
+  // Parser les données du livre à partir de la requête
   const bookObject = JSON.parse(req.body.book);
   delete bookObject._id;
   delete bookObject._userId;
 
+  // Créer une nouvelle instance de livre avec les données parsées
   const book = new Book({
     ...bookObject,
     userId: req.auth.userId,
@@ -17,7 +19,7 @@ exports.createBook = (req, res, next) => {
       req.file.filename
     }`,
   });
-
+  // Sauvegarder le nouveau livre dans la base de données
   book
     .save()
     .then((createdBook) => {
@@ -42,6 +44,8 @@ exports.modifyBook = (req, res, next) => {
     : { ...req.body };
 
   delete bookObject._userId;
+
+  // Trouver le livre à modifier en fonction de son id
   Book.findOne({ _id: req.params.id })
     .then((book) => {
       if (!book) {
@@ -65,7 +69,7 @@ exports.modifyBook = (req, res, next) => {
             console.error("Error deleting previous optimized image:", error);
           });
       }
-
+      // Mettre à jour les détails du livre
       Book.updateOne(
         { _id: req.params.id },
         { ...bookObject, _id: req.params.id }
@@ -83,6 +87,7 @@ exports.modifyBook = (req, res, next) => {
 };
 
 exports.deleteBook = (req, res, next) => {
+  // Trouver le livre à supprimer selon id
   Book.findOne({ _id: req.params.id })
     .then((book) => {
       if (book.userId != req.auth.userId) {
@@ -90,6 +95,7 @@ exports.deleteBook = (req, res, next) => {
       } else {
         const filename = book.imageUrl.split("/images/")[1];
         fs.unlink(`images/${filename}`, () => {
+          // Supprimer le livre dans la base de données
           Book.deleteOne({ _id: req.params.id })
             .then(() => {
               res.status(200).json({ message: "Objet supprimé !" });
@@ -132,18 +138,18 @@ exports.rateBook = (req, res, next) => {
   console.log("Received ID:", id);
   console.log("Received rating:", rating);
 
+  // Valider la valeur de la note
   if (isNaN(rating) || rating < 1 || rating > 5) {
     return res
       .status(400)
       .json({ message: "Rating should be between 1 and 5" });
   }
-
+  // Valider l'ID du livre
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: "Invalid book ID" });
   }
 
-  const objectId = new mongoose.Types.ObjectId(id);
-
+  // Trouver le livre pour ajouter ou mettre à jour la note
   Book.findOne({ _id: objectId })
     .then((book) => {
       if (!book) {
@@ -169,7 +175,7 @@ exports.rateBook = (req, res, next) => {
         book.ratings.reduce((acc, curr) => acc + curr.grade, 0) /
         newRatingsCount;
 
-      book.averageRating = newAverageRating;
+      book.averageRating = Math.round(newAverageRating * 100) / 100;
 
       return book.save();
     })
@@ -185,8 +191,8 @@ exports.rateBook = (req, res, next) => {
 
 exports.bestRatingBooks = (req, res, next) => {
   Book.find({ averageRating: { $gte: 1 } })
-    .sort({ averageRating: -1 })
-    .limit(3)
+    .sort({ averageRating: -1 }) // Trier les livres par note moyenne décroissante
+    .limit(3) // Limiter le résultat à 3 livres
     .then((books) => {
       res.status(200).json(books);
     })
