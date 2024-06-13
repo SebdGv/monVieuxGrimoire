@@ -90,6 +90,9 @@ exports.deleteBook = (req, res, next) => {
   // Trouver le livre à supprimer selon id
   Book.findOne({ _id: req.params.id })
     .then((book) => {
+      if (!book) {
+        return res.status(404).json({ message: "Book not found" });
+      }
       if (book.userId != req.auth.userId) {
         res.status(401).json({ message: "Not authorized" });
       } else {
@@ -150,7 +153,7 @@ exports.rateBook = (req, res, next) => {
   }
 
   // Trouver le livre pour ajouter ou mettre à jour la note
-  Book.findOne({ _id: objectId })
+  Book.findOne({ _id: id })
     .then((book) => {
       if (!book) {
         return res.status(404).json({ message: "Book not found" });
